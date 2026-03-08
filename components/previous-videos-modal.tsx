@@ -252,10 +252,6 @@ const VideoPlayerModal = ({
       )
     }
     setHasStarted(true)
-
-    setIsLoading(true)
-        const timer = setTimeout(() => setIsLoading(false), 2000)
-        return () => clearTimeout(timer)
   }, [])
 
   // Reset hasStarted when modal opens / video changes
@@ -266,19 +262,14 @@ const VideoPlayerModal = ({
   }, [isOpen, video?.videoId])
   
   // Handle modal open timing and loading state
-  // On non-iOS, start the branded overlay immediately (hides YT title while iframe loads).
-  // On iOS, the user must tap "Tap to Play" first — the overlay starts after that tap
-  // (triggered by handleiOSPlay setting isLoading=true).
   useEffect(() => {
     if (isOpen) {
       setModalOpenTime(new Date())
-      if (!isIOS) {
-        setIsLoading(true)
-        const timer = setTimeout(() => setIsLoading(false), 4000)
-        return () => clearTimeout(timer)
-      }
+      setIsLoading(true)
+      const timer = setTimeout(() => setIsLoading(false), 2000)
+      return () => clearTimeout(timer)
     }
-  }, [isOpen, isIOS])
+  }, [isOpen])
   
   // Handle volume change via postMessage to YouTube iframe
   const handleVolumeChange = useCallback((value: number[]) => {
