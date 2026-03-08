@@ -244,10 +244,7 @@ const VideoPlayerModal = ({
   // which iOS accepts as user-initiated playback.
   const [hasStarted, setHasStarted] = useState(false)
 
-  const loadingTimerRef = useRef<NodeJS.Timeout | null>(null)
-
   const handleiOSPlay = useCallback(() => {
-    // Send playVideo command inside the user-gesture window
     if (iframeRef.current?.contentWindow) {
       iframeRef.current.contentWindow.postMessage(
         JSON.stringify({ event: 'command', func: 'playVideo', args: [] }),
@@ -255,19 +252,16 @@ const VideoPlayerModal = ({
       )
     }
     setHasStarted(true)
-    // Now start the branded overlay to hide the YouTube title while the video loads
+
     setIsLoading(true)
-    if (loadingTimerRef.current) clearTimeout(loadingTimerRef.current)
-    loadingTimerRef.current = setTimeout(() => setIsLoading(false), 4000)
+        const timer = setTimeout(() => setIsLoading(false), 2000)
+        return () => clearTimeout(timer)
   }, [])
 
   // Reset hasStarted when modal opens / video changes
   useEffect(() => {
     if (isOpen) {
       setHasStarted(false)
-    }
-    return () => {
-      if (loadingTimerRef.current) clearTimeout(loadingTimerRef.current)
     }
   }, [isOpen, video?.videoId])
   
