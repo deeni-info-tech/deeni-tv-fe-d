@@ -42,6 +42,15 @@ export function useYouTubePlayer() {
   const videoIdRef = useRef<string>('')
   // Tracks whether we have a silently primed player that hasn't been swapped yet
   const isPrimedRef = useRef<boolean>(false)
+  // ── Delegating event-handler refs ──
+  // The primed player's YT.Player events are wired to these refs at construction
+  // time.  Initially they are no-ops.  When the real video loads (iOS path), we
+  // swap them to the real handlers via setPlayerCallbacks() — the same YT.Player
+  // instance stays alive, preserving iOS's audio-unlock gesture context.
+  const onStateChangeRef = useRef<((state: number) => void) | null>(null)
+  const onErrorRef = useRef<((code: number, msg: string) => void) | null>(null)
+  const onDurationChangeRef = useRef<((duration: number) => void) | null>(null)
+  const onReadyRef = useRef<((player: any) => void) | null>(null)
   
   const loadYouTubeAPI = useCallback((): Promise<void> => {
     return new Promise((resolve, reject) => {
@@ -259,10 +268,29 @@ export function useYouTubePlayer() {
               } catch (_) {}
             }
             setTimeout(() => patchPrimer(), 50)
+            // Delegate to ref (if swapped by setPlayerCallbacks before onReady fires)
+            onReadyRef.current?.(playerRef.current)
           },
-          // Suppress all events — we don't care about this placeholder's lifecycle
-          onStateChange: () => {},
-          onError: () => {},
+          // Delegate through refs — initially no-ops; swapped by setPlayerCallbacks
+          // when the real video loads, so we keep the same YT.Player instance.
+          onStateChange: (event: any) => {
+            if (onStateChangeRef.current) {
+              onStateChangeRef.current(event.data)
+            }
+            // Also track duration on PLAYING/CUED like initializePlayer does
+            if (event.data === YT_STATE.CUED || event.data === YT_STATE.PLAYING) {
+              try {
+                const dur = event.target.getDuration()
+                if (dur && !isNaN(dur) && dur > 0 && dur !== durationRef.current) {
+                  durationRef.current = dur
+                  onDurationChangeRef.current?.(dur)
+                }
+              } catch (_) {}
+            }
+          },
+          onError: (event: any) => {
+            onErrorRef.current?.(event.data, `Error ${event.data}`)
+          },
         },
       })
     } catch (_) {
@@ -287,6 +315,24 @@ export function useYouTubePlayer() {
         playerRef.current.setVolume(targetVolume)
       }
     } catch (_) {}
+  }, [])
+
+  // ── setPlayerCallbacks ──────────────────────────────────────────────────────
+  // Swap the delegating-ref event handlers that the primed player calls.
+  // Call this BEFORE loadVideoById so that state-change events from the real
+  // video reach the caller's handlers (onReady, onStateChange, etc.).
+  // This avoids destroying the primed YT.Player (which would lose the iOS
+  // audio-unlock gesture context).
+  const setPlayerCallbacks = useCallback((callbacks: {
+    onReady?: (player: any) => void
+    onStateChange?: (state: number) => void
+    onError?: (code: number, msg: string) => void
+    onDurationChange?: (duration: number) => void
+  }) => {
+    onReadyRef.current = callbacks.onReady ?? null
+    onStateChangeRef.current = callbacks.onStateChange ?? null
+    onErrorRef.current = callbacks.onError ?? null
+    onDurationChangeRef.current = callbacks.onDurationChange ?? null
   }, [])
 
   const loadVideo = useCallback((videoId: string, startSeconds?: number) => {
@@ -417,6 +463,7 @@ export function useYouTubePlayer() {
     initializePlayer,
     primePlayer,
     unmuteAndResume,
+    setPlayerCallbacks,
     isPrimedRef,
     loadVideo,
     getDuration,

@@ -880,6 +880,11 @@ export function SyncedVideoPlayer({
   // Branded loading overlay state - event-based, not timer-based
   const [showBrandedOverlay, setShowBrandedOverlay] = useState(false)
   const brandedOverlayProgramRef = useRef<string>('')
+  // iframeVisible — keeps the iframe container at opacity:0 until the REAL video
+  // fires its first PLAYING event.  Prevents the primer (zoo) video from flashing
+  // on screen.  Once true it stays true; subsequent transitions are hidden by
+  // BrandedLoadingOverlay sitting on top instead.
+  const [iframeVisible, setIframeVisible] = useState(false)
   
   // Channel State
   const [apiChannels, setApiChannels] = useState<ApiChannel[]>([])
@@ -934,6 +939,7 @@ export function SyncedVideoPlayer({
     initializePlayer, 
     primePlayer,
     unmuteAndResume,
+    setPlayerCallbacks,
     isPrimedRef,
     loadVideo, 
     getDuration,
@@ -1521,6 +1527,7 @@ export function SyncedVideoPlayer({
               console.log('▶️ 11 Video is now playing')
               setIsLoading(false);
               setShowStartScreen(false) // Ensure start screen is hidden
+              setIframeVisible(true)
               setTimeout(() => {
                 setShowBrandedOverlay(false) // Hide branded overlay when playback starts
               }, 3000);
@@ -1552,31 +1559,28 @@ export function SyncedVideoPlayer({
           }
         })
       } else if (isPrimedRef.current) {
-        // ── iOS fast-path: reuse the silently primed player ──────────────────
-        // The primed player is already running muted in the background.
-        // We DON'T destroy and re-create — that would break the audio unlock we
-        // obtained in handleFirstTimeStart (unmuteAndResume called synchronously
-        // inside the gesture).  Instead we just swap the video and wire up new
-        // event callbacks via a lightweight approach:
-        //   1. Replace the video with loadVideoById
-        //   2. Attach a one-shot state-change listener via the existing player
+        // ── iOS fast-path: REUSE the primed player — do NOT destroy it ────────
+        // The primed YT.Player already has iOS's audio-unlock context from the
+        // synchronous unmuteAndResume() call in handleFirstTimeStart.  Calling
+        // initializePlayer would nuke that player and create a new one OUTSIDE
+        // the gesture window → iOS blocks audio again → stuck on loading.
         //
-        // Because the player was unlocked in the gesture, loadVideoById plays
-        // the new video with sound immediately on iOS — no extra tap needed.
-        console.log('🍎 iOS primer path — swapping video in primed player')
-        isPrimedRef.current = false // consumed; next load goes through normal path
+        // Instead:
+        //   1. setPlayerCallbacks() — swap the no-op event refs to real handlers
+        //   2. loadVideo() — calls loadVideoById on the SAME player instance
+        // The same YT.Player stays alive, audio stays unlocked, events flow.
+        console.log('🍎 iOS primer path — reusing primed player (no destroy)')
+        isPrimedRef.current = false // consumed; subsequent loads go through normal path
 
-        // Wire up event handlers on the existing YT player instance
-        const ytPlayer = (window as any)._ytPrimedPlayer ?? null
-        // The player lives in playerRef (set during primePlayer); attach handlers
-        // by re-registering via addEventListener (YouTube IFrame API supports this)
-        try {
-          const primedPlayer = (window as any).__yt_primer_player_ref ?? null
-          // Fallback: use loadVideo (which calls loadVideoById on playerRef.current)
-          // and let onStateChange track state via a closure we set up now.
-          const onStateChange = (state: number) => {
+        // 1. Wire up real event handlers via the delegating refs
+        setPlayerCallbacks({
+          onReady: () => {
+            // This fires on initial creation only; for loadVideoById it won't fire
+            // again — we handle everything via onStateChange below.
+          },
+          onStateChange: (state: number) => {
             if (!mountedRef.current) return
-            console.log('🎬 iOS primer state changed:', state)
+            console.log('🎬 🍎 iOS state changed:', state)
             if (state === YT_STATE.ENDED) {
               setShowBrandedOverlay(true)
               setIsLoading(false)
@@ -1584,55 +1588,46 @@ export function SyncedVideoPlayer({
               if (videoEndTimeoutRef.current) clearTimeout(videoEndTimeoutRef.current)
               playNextVideoRef.current()
             } else if (state === YT_STATE.PLAYING) {
+              console.log('▶️ 🍎 Real video is PLAYING on iOS')
               setIsLoading(false)
               setShowStartScreen(false)
               setPlayerReady(true)
+              setIframeVisible(true) // Reveal iframe — real video is now rendering
+              setIsMuted(false)
+              onStartClick?.()
               setTimeout(() => setShowBrandedOverlay(false), 3000)
             } else if (state === YT_STATE.PAUSED) {
+              // iOS sometimes auto-pauses; resume
               play()
+            } else if (state === YT_STATE.BUFFERING) {
+              console.log('⏳ 🍎 Buffering...')
             } else if (state === YT_STATE.CUED) {
               play()
             }
-          }
-          // Re-initialize with the real video but skip creating a new iframe —
-          // initializePlayer will destroy the primed one and build a fresh player
-          // in the same container. The audio unlock persists for the WKWebView
-          // session, so the new player also benefits from it.
-          await initializePlayer({
-            videoId: program.videoId,
-            startSeconds: Math.floor(startTime),
-            volume: volume,
-            muted: false, // already unlocked by unmuteAndResume() in the gesture
-            onReady: () => {
-              console.log('✅ iOS primer → real player ready')
-              setPlayerReady(true)
-              setIsLoading(false)
-              setShowStartScreen(false)
-              onStartClick?.()
-              seekTo(startTime, true)
-              play()
-              setYouTubeVolume(volume)
-              setYouTubeMuted(false)
-              setIsMuted(false)
-              const duration = getDuration()
-              if (duration && duration > 0) setVideoDuration(duration)
-            },
-            onStateChange,
-            onDurationChange: (duration) => {
-              if (duration && duration > 0) setVideoDuration(duration)
-            },
-            onError: (code, msg) => {
-              console.error('Player error:', code, msg)
-              if (code === 2 || code === 5 || code === 100) {
-                setApiError(`Playback error: ${msg}`)
-              }
-              setIsLoading(false)
-            },
-          })
-        } catch (err) {
-          console.error('iOS primer swap failed, falling through to normal init:', err)
-          // Fall through — the catch below will set apiError
-          throw err
+          },
+          onDurationChange: (duration: number) => {
+            if (duration && duration > 0) setVideoDuration(duration)
+          },
+          onError: (code: number, msg: string) => {
+            console.error('🍎 Player error:', code, msg)
+            if (code === 2 || code === 5 || code === 100) {
+              setApiError(`Playback error: ${msg}`)
+            }
+            setIsLoading(false)
+          },
+        })
+
+        // 2. Swap the video on the existing player — keeps audio unlock alive
+        lastVideoIdRef.current = program.videoId
+        const loaded = loadVideo(program.videoId, Math.floor(startTime))
+        if (loaded) {
+          console.log('✅ 🍎 Video swapped on primed player')
+          setYouTubeVolume(volume)
+          // Don't call setYouTubeMuted(false) — unmuteAndResume already did it
+          // synchronously in the gesture. Calling it again is harmless but redundant.
+        } else {
+          console.error('❌ 🍎 loadVideo failed on primed player')
+          setIsLoading(false)
         }
       } else {
         await initializePlayer({
@@ -1682,6 +1677,7 @@ export function SyncedVideoPlayer({
             } else if (state === YT_STATE.PLAYING) {
               console.log('▶️ 22 Video is now playing')
               setIsLoading(false);
+              setIframeVisible(true)
               setTimeout(() => {
                 setShowBrandedOverlay(false) // Hide branded overlay when playback starts
               }, 3000);
@@ -1963,6 +1959,7 @@ export function SyncedVideoPlayer({
     setPlayerReady(false)
     setCurrentProgram(null)
     setApiError(null)
+    setIframeVisible(false) // hide iframe until next real PLAYING event
     destroy()
     
     // Reload same channel — previousVideos state and localStorage are preserved
@@ -2200,12 +2197,14 @@ export function SyncedVideoPlayer({
             isFullscreen ? 'rounded-none border-0' : 'rounded-t-2xl md:rounded-t-3xl rounded-b-none'
           }`}
         >
-          {/* YouTube iframe container — hidden (opacity-0) while start screen is
-              showing so the silent primer video is never visible to the user. */}
+          {/* YouTube iframe container — stays opacity:0 until the real video fires
+              its first PLAYING event (iframeVisible).  This hides the primer video
+              AND the brief blank iframe during player init.  Subsequent video
+              transitions are covered by BrandedLoadingOverlay instead. */}
           <div
             ref={youtubeContainerRef}
             className="absolute inset-0 w-full h-full"
-            style={{ opacity: showStartScreen ? 0 : 1 }}
+            style={{ opacity: iframeVisible ? 1 : 0 }}
           />
           <div className="absolute inset-0 w-full h-full pointer-events-auto" />
           
