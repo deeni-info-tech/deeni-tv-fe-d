@@ -244,7 +244,10 @@ const VideoPlayerModal = ({
   // which iOS accepts as user-initiated playback.
   const [hasStarted, setHasStarted] = useState(false)
 
+  const loadingTimerRef = useRef<NodeJS.Timeout | null>(null)
+
   const handleiOSPlay = useCallback(() => {
+    // Send playVideo command inside the user-gesture window
     if (iframeRef.current?.contentWindow) {
       iframeRef.current.contentWindow.postMessage(
         JSON.stringify({ event: 'command', func: 'playVideo', args: [] }),
@@ -252,6 +255,10 @@ const VideoPlayerModal = ({
       )
     }
     setHasStarted(true)
+    // Now start the branded overlay to hide the YouTube title while the video loads
+    setIsLoading(true)
+    if (loadingTimerRef.current) clearTimeout(loadingTimerRef.current)
+    loadingTimerRef.current = setTimeout(() => setIsLoading(false), 4000)
   }, [])
 
   // Reset hasStarted when modal opens / video changes
@@ -259,17 +266,25 @@ const VideoPlayerModal = ({
     if (isOpen) {
       setHasStarted(false)
     }
+    return () => {
+      if (loadingTimerRef.current) clearTimeout(loadingTimerRef.current)
+    }
   }, [isOpen, video?.videoId])
   
   // Handle modal open timing and loading state
+  // On non-iOS, start the branded overlay immediately (hides YT title while iframe loads).
+  // On iOS, the user must tap "Tap to Play" first — the overlay starts after that tap
+  // (triggered by handleiOSPlay setting isLoading=true).
   useEffect(() => {
     if (isOpen) {
       setModalOpenTime(new Date())
-      setIsLoading(true)
-      const timer = setTimeout(() => setIsLoading(false), 2000)
-      return () => clearTimeout(timer)
+      if (!isIOS) {
+        setIsLoading(true)
+        const timer = setTimeout(() => setIsLoading(false), 4000)
+        return () => clearTimeout(timer)
+      }
     }
-  }, [isOpen])
+  }, [isOpen, isIOS])
   
   // Handle volume change via postMessage to YouTube iframe
   const handleVolumeChange = useCallback((value: number[]) => {
