@@ -266,7 +266,7 @@ const VideoPlayerModal = ({
     if (isOpen) {
       setModalOpenTime(new Date())
       setIsLoading(true)
-      const timer = setTimeout(() => setIsLoading(false), 4000)
+      const timer = setTimeout(() => setIsLoading(false), 2000)
       return () => clearTimeout(timer)
     }
   }, [isOpen])
@@ -410,7 +410,8 @@ const VideoPlayerModal = ({
                     animate={{ opacity: 1 }}
                     exit={{ opacity: 0 }}
                     onClick={handleiOSPlay}
-                    className="absolute inset-0 z-[50] flex items-center justify-center bg-black/40 backdrop-blur-[2px] cursor-pointer"
+                    // className="absolute inset-0 z-[50] flex items-center justify-center bg-black/40 backdrop-blur-[2px] cursor-pointer"
+                    className="absolute inset-0 z-[50] flex items-center justify-center bg-black cursor-pointer"
                   >
                     <motion.div
                       initial={{ scale: 0.8 }}
