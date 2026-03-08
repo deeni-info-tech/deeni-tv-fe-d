@@ -199,62 +199,62 @@ export const CHANNELS: Channel[] = [
     icon: '📺',
     programs: BENGALI_VIDEOS,
   },
-  // {
-  //   id: 'english-1',
-  //   name: 'English',
-  //   language: 'English',
-  //   icon: '📺',
-  //   programs: ENGLISH_VIDEOS,
-  // },
-  // {
-  //   id: 'arabic-1',
-  //   name: 'العربية',
-  //   language: 'Arabic',
-  //   icon: '📺',
-  //   programs: ARABIC_VIDEOS,
-  // },
-  // {
-  //   id: 'urdu-1',
-  //   name: 'اردو',
-  //   language: 'Urdu',
-  //   icon: '📺',
-  //   programs: [],
-  // },
-  // {
-  //   id: 'chinese-1',
-  //   name: '中文',
-  //   language: 'Chinese',
-  //   icon: '📺',
-  //   programs: [],
-  // },
-  // {
-  //   id: 'quran-bangla',
-  //   name: 'কুরআন বাংলা',
-  //   language: 'Bengali',
-  //   icon: '📖',
-  //   programs: [],
-  // },
-  // {
-  //   id: 'quran-english',
-  //   name: 'Quran English',
-  //   language: 'English',
-  //   icon: '📖',
-  //   programs: [],
-  // },
-  // {
-  //   id: 'quran-arabic',
-  //   name: 'القرآن العربي',
-  //   language: 'Arabic',
-  //   icon: '📖',
-  //   programs: [],
-  // },
-  // {
-  //   id: 'quran-chinese',
-  //   name: '古兰经中文',
-  //   language: 'Chinese',
-  //   icon: '📖',
-  //   programs: [],
-  // },
+  {
+    id: 'english-1',
+    name: 'English',
+    language: 'English',
+    icon: '📺',
+    programs: ENGLISH_VIDEOS,
+  },
+  {
+    id: 'arabic-1',
+    name: 'العربية',
+    language: 'Arabic',
+    icon: '📺',
+    programs: ARABIC_VIDEOS,
+  },
+  {
+    id: 'urdu-1',
+    name: 'اردو',
+    language: 'Urdu',
+    icon: '📺',
+    programs: [],
+  },
+  {
+    id: 'chinese-1',
+    name: '中文',
+    language: 'Chinese',
+    icon: '📺',
+    programs: [],
+  },
+  {
+    id: 'quran-bangla',
+    name: 'কুরআন বাংলা',
+    language: 'Bengali',
+    icon: '📖',
+    programs: [],
+  },
+  {
+    id: 'quran-english',
+    name: 'Quran English',
+    language: 'English',
+    icon: '📖',
+    programs: [],
+  },
+  {
+    id: 'quran-arabic',
+    name: 'القرآن العربي',
+    language: 'Arabic',
+    icon: '📖',
+    programs: [],
+  },
+  {
+    id: 'quran-chinese',
+    name: '古兰经中文',
+    language: 'Chinese',
+    icon: '📖',
+    programs: [],
+  },
 ]
 
 // Map channel IDs to external API lid values
@@ -545,4 +545,37 @@ export function formatDuration(seconds: number): string {
   
   if (mins === 1) return `${mins} min`
   return `${mins} mins`
+}
+
+// ── API Channel ──
+// Exact shape returned by https://api.deeniinfotech.com/api/tv-channels
+
+export interface ApiChannel {
+  id: number
+  title: string
+  localizationId: string
+  isQuran: boolean | null
+}
+
+export const API_CHANNELS_STORAGE_KEY = 'deeni-tv-channels'
+
+/** Read stored channel list from localStorage (as-is from API) */
+export function getStoredApiChannels(): ApiChannel[] {
+  if (typeof window === 'undefined') return []
+  try {
+    const stored = localStorage.getItem(API_CHANNELS_STORAGE_KEY)
+    return stored ? JSON.parse(stored) : []
+  } catch {
+    return []
+  }
+}
+
+/** Persist channel list to localStorage exactly as received from the API */
+export function saveApiChannels(channels: ApiChannel[]): void {
+  if (typeof window === 'undefined') return
+  try {
+    localStorage.setItem(API_CHANNELS_STORAGE_KEY, JSON.stringify(channels))
+  } catch (error) {
+    console.error('Error saving API channels:', error)
+  }
 }
