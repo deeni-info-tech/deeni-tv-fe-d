@@ -880,12 +880,6 @@ export function SyncedVideoPlayer({
   // Branded loading overlay state - event-based, not timer-based
   const [showBrandedOverlay, setShowBrandedOverlay] = useState(false)
   const brandedOverlayProgramRef = useRef<string>('')
-  // iframeVisible — keeps the iframe container opacity:0 until the REAL video
-  // fires its first PLAYING event.  This prevents the primer (zoo) video from
-  // flashing on screen for the ~1 s between unmuteAndResume() and the real
-  // player being swapped in.  After first play it stays true permanently;
-  // subsequent video transitions are hidden by BrandedLoadingOverlay instead.
-  const [iframeVisible, setIframeVisible] = useState(false)
   
   // Channel State
   const [apiChannels, setApiChannels] = useState<ApiChannel[]>([])
@@ -1527,7 +1521,6 @@ export function SyncedVideoPlayer({
               console.log('▶️ 11 Video is now playing')
               setIsLoading(false);
               setShowStartScreen(false) // Ensure start screen is hidden
-              setIframeVisible(true)    // Reveal iframe — real video is now rendering
               setTimeout(() => {
                 setShowBrandedOverlay(false) // Hide branded overlay when playback starts
               }, 3000);
@@ -1594,7 +1587,6 @@ export function SyncedVideoPlayer({
               setIsLoading(false)
               setShowStartScreen(false)
               setPlayerReady(true)
-              setIframeVisible(true)    // Reveal iframe — real video is now rendering
               setTimeout(() => setShowBrandedOverlay(false), 3000)
             } else if (state === YT_STATE.PAUSED) {
               play()
@@ -1690,7 +1682,6 @@ export function SyncedVideoPlayer({
             } else if (state === YT_STATE.PLAYING) {
               console.log('▶️ 22 Video is now playing')
               setIsLoading(false);
-              setIframeVisible(true)    // Reveal iframe — real video is now rendering
               setTimeout(() => {
                 setShowBrandedOverlay(false) // Hide branded overlay when playback starts
               }, 3000);
@@ -1972,7 +1963,6 @@ export function SyncedVideoPlayer({
     setPlayerReady(false)
     setCurrentProgram(null)
     setApiError(null)
-    setIframeVisible(false) // Re-arm the flash-guard for the new player
     destroy()
     
     // Reload same channel — previousVideos state and localStorage are preserved
@@ -2210,15 +2200,12 @@ export function SyncedVideoPlayer({
             isFullscreen ? 'rounded-none border-0' : 'rounded-t-2xl md:rounded-t-3xl rounded-b-none'
           }`}
         >
-          {/* YouTube iframe container — stays opacity:0 until the real video fires
-              its first PLAYING event (iframeVisible).  This hides both the primer
-              placeholder AND the brief blank iframe during real-player init,
-              without impacting subsequent video transitions (covered by
-              BrandedLoadingOverlay). */}
+          {/* YouTube iframe container — hidden (opacity-0) while start screen is
+              showing so the silent primer video is never visible to the user. */}
           <div
             ref={youtubeContainerRef}
             className="absolute inset-0 w-full h-full"
-            style={{ opacity: iframeVisible ? 1 : 0 }}
+            style={{ opacity: showStartScreen ? 0 : 1 }}
           />
           <div className="absolute inset-0 w-full h-full pointer-events-auto" />
           
