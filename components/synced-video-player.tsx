@@ -1528,6 +1528,8 @@ export function SyncedVideoPlayer({
               setIsLoading(false);
               setShowStartScreen(false) // Ensure start screen is hidden
               setIframeVisible(true)
+              setIsMuted(false)
+              onStartClick?.()
               setTimeout(() => {
                 setShowBrandedOverlay(false) // Hide branded overlay when playback starts
               }, 3000);
