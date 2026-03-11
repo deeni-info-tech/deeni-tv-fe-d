@@ -38,7 +38,7 @@ export const metadata: Metadata = {
     default: 'Deeni.tv',
     template: '%s | Deeni.tv'
   },
-  description: 'Experience premium spiritual content in a cinematic lean-back TV interface. Watch Islamic lectures, Ramadan guides, and more in a synchronized TV-like experience.',
+  description: 'Experience premium spiritual content in a lean-back TV interface. Watch Islamic lectures, Ramadan guides, and more in a synchronized TV-like experience.',
   generator: 'Next.js',
   applicationName: 'Deeni.tv',
   referrer: 'origin-when-cross-origin',
@@ -54,27 +54,31 @@ export const metadata: Metadata = {
   
   icons: {
     icon: [
-      { url: '/App_logo_192.jpeg', sizes: '192x192', type: 'image/jpeg' },
-      { url: '/App_logo_256.jpeg', sizes: '256x256', type: 'image/jpeg' },
-      { url: '/App_logo_384.jpeg', sizes: '384x384', type: 'image/jpeg' },
-      { url: '/App_logo_512.jpeg', sizes: '512x512', type: 'image/jpeg' },
+      { url: '/App_logo_192.png', sizes: '192x192', type: 'image/png' },
+      { url: '/App_logo_256.png', sizes: '256x256', type: 'image/png' },
+      { url: '/App_logo_384.png', sizes: '384x384', type: 'image/png' },
+      { url: '/App_logo_512.png', sizes: '512x512', type: 'image/png' },
+      { url: '/1024-1024-size.png', sizes: '1024x1024', type: 'image/png' },
+      { url: '/2732-2732-size.png', sizes: '2732x2732', type: 'image/png' },
     ],
     apple: [
-      { url: '/App_logo_192.jpeg', sizes: '192x192', type: 'image/jpeg' },
+      { url: '/App_logo_192.png', sizes: '192x192', type: 'image/png' },
+      { url: '/1024-1024-size.png', sizes: '1024x1024', type: 'image/png' },
+      { url: '/2732-2732-size.png', sizes: '2732x2732', type: 'image/png' },
     ],
-    shortcut: '/App_logo_192.jpeg',
+    shortcut: '/App_logo_192.png',
   },
 
   manifest: '/manifest.json',
   
   openGraph: {
     title: 'Deeni.tv',
-    description: 'Experience premium spiritual content in a cinematic lean-back TV interface',
+    description: 'Experience premium spiritual content in a lean-back TV interface',
     url: 'https://deeni.tv',
     siteName: 'Deeni.tv',
     images: [
       {
-        url: '/Deeni-TV-Cover-1200-630.jpg',
+        url: '/Deeni-TV-Play-store-Cover-1200-630.png',
         width: 1200,
         height: 630,
         alt: 'Deeni.tv',
@@ -87,8 +91,8 @@ export const metadata: Metadata = {
   twitter: {
     card: 'summary_large_image',
     title: 'Deeni.tv',
-    description: 'Experience premium spiritual content in a cinematic lean-back TV interface',
-    images: ['/Deeni-TV-Cover-1200-630.jpg'],
+    images: ['/Deeni-TV-Play-store-Cover-1200-630.png'],
+    description: 'Experience premium spiritual content in a lean-back TV interface',    
     creator: '@deenitv',
   },
   

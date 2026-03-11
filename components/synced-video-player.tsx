@@ -117,7 +117,7 @@ const ChannelSelectorModal = ({
               </div>
             </div>
             
-            <div className="p-4 border-b border-white/10">
+            {/* <div className="p-4 border-b border-white/10">
               <div className="relative">
                 <input
                   type="text"
@@ -128,7 +128,7 @@ const ChannelSelectorModal = ({
                 />
                 <Globe className="absolute left-3 top-3.5 h-4 w-4 text-white/40" />
               </div>
-            </div>
+            </div> */}
             
             <div className="p-4 max-h-[60vh] overflow-y-auto custom-scrollbar">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
@@ -1472,7 +1472,64 @@ export function SyncedVideoPlayer({
       
       // No branded overlay on initial channel load — only on video transitions (playNextVideo)
       
-      if (playerReady) {
+      if (playerReady && isIOS) {
+        // ── iOS channel-switch / reload: REUSE existing player ──────────────
+        // On iOS, destroying the YT.Player and creating a new one kills the
+        // audio-unlock obtained from the original user gesture.  Instead, swap
+        // event handlers via delegating refs and load the new video on the SAME
+        // player instance — audio stays unlocked, no extra tap needed.
+        console.log('🔄 🍎 iOS channel switch — reusing player (no destroy)')
+
+        setPlayerCallbacks({
+          onReady: () => { /* loadVideoById won't re-fire onReady */ },
+          onStateChange: (state: number) => {
+            if (!mountedRef.current) return
+            console.log('🎬 🍎 11 iOS state changed:', state)
+            if (state === YT_STATE.ENDED) {
+              setShowBrandedOverlay(true)
+              setIsLoading(false)
+              setShowStartScreen(false)
+              if (videoEndTimeoutRef.current) clearTimeout(videoEndTimeoutRef.current)
+              playNextVideoRef.current()
+            } else if (state === YT_STATE.PLAYING) {
+              console.log('▶️ 🍎 11 Video is now playing on iOS')
+              setIsLoading(false)
+              setShowStartScreen(false)
+              setPlayerReady(true)
+              setIframeVisible(true)
+              setTimeout(() => setShowBrandedOverlay(false), 3000)
+            } else if (state === YT_STATE.PAUSED) {
+              play()
+            } else if (state === YT_STATE.BUFFERING) {
+              console.log('⏳ 🍎 11 Buffering...')
+            } else if (state === YT_STATE.CUED) {
+              play()
+            }
+          },
+          onDurationChange: (duration: number) => {
+            if (duration && duration > 0) setVideoDuration(duration)
+          },
+          onError: (code: number, msg: string) => {
+            console.error('🍎 11 Player error:', code, msg)
+            if (code === 2 || code === 5 || code === 100) {
+              setApiError(`Playback error: ${msg}`)
+            }
+            setIsLoading(false)
+          },
+        })
+
+        lastVideoIdRef.current = program.videoId
+        const loaded = loadVideo(program.videoId, Math.floor(startTime))
+        if (loaded) {
+          console.log('✅ 🍎 11 Video swapped on existing player')
+          setYouTubeVolume(volume)
+          setYouTubeMuted(false)
+          setIsMuted(false)
+        } else {
+          console.error('❌ 🍎 11 loadVideo failed')
+          setIsLoading(false)
+        }
+      } else if (playerReady) {
         console.log('🔄 Loading new video in existing player')
         // First destroy and reset everything
         destroy()
@@ -1486,7 +1543,7 @@ export function SyncedVideoPlayer({
           videoId: program.videoId,
           startSeconds: Math.floor(startTime),
           volume: volume,
-          muted: isIOS, // start muted on iOS so Safari allows autoplay; user taps to unmute
+          muted: false, // non-iOS path; audio is fine
           onReady: () => {
             console.log('✅ 11 Player ready after channel switch')
             setPlayerReady(true)
@@ -1502,11 +1559,8 @@ export function SyncedVideoPlayer({
             }
             
             setYouTubeVolume(volume)
-            // On iOS keep muted until user taps the unmute button (user gesture required)
-            if (!isIOS) {
-              setIsMuted(false)
-              setYouTubeMuted(false)
-            }
+            setIsMuted(false)
+            setYouTubeMuted(false)
           },
           onStateChange: (state) => {
             if (!mountedRef.current) return
@@ -1716,7 +1770,7 @@ export function SyncedVideoPlayer({
       setApiError(error instanceof Error ? error.message : 'Failed to load video')
       setIsLoading(false)
     }
-  }, [isLoading, playerReady, isPrimedRef, volume, initializePlayer, loadVideo, seekTo, play, setYouTubeVolume, setYouTubeMuted, onChannelChange, onStartClick, getDuration, fetchFromBrowserAPI, notifyParentScheduleChange])
+  }, [isLoading, playerReady, isPrimedRef, volume, initializePlayer, loadVideo, seekTo, play, setYouTubeVolume, setYouTubeMuted, onChannelChange, onStartClick, getDuration, fetchFromBrowserAPI, notifyParentScheduleChange, isIOS, setPlayerCallbacks])
 
   const handleFirstTimeStart = useCallback(async () => {
     // ── Step 0 (synchronous — MUST be first, before any await) ──────────────
@@ -1980,18 +2034,27 @@ export function SyncedVideoPlayer({
       setPreviousVideos(updated)
     }
     
-    // Reset player state only — do NOT touch previousVideos or localStorage
-    setPlayerReady(false)
+    // Reset player state — but on iOS keep the player ALIVE so the audio-unlock
+    // from the original "Start Watching" gesture is preserved.  Destroying the
+    // YT.Player kills iOS's audio permission; the new player would be muted.
     setCurrentProgram(null)
     setApiError(null)
     setIframeVisible(false) // hide iframe until next real PLAYING event
-    destroy()
+
+    if (isIOS) {
+      // iOS: keep playerReady true, DON'T destroy.  loadChannel will hit the
+      // "playerReady && isIOS" branch which reuses the player via loadVideo.
+      console.log('🔄 🍎 iOS reload — keeping player alive')
+    } else {
+      setPlayerReady(false)
+      destroy()
+    }
     
     // Reload same channel — previousVideos state and localStorage are preserved
     setTimeout(() => {
       loadChannel(currentChannelId)
     }, 200)
-  }, [destroy, currentChannelId, currentProgram, loadChannel])
+  }, [destroy, currentChannelId, currentProgram, loadChannel, isIOS])
 
   // Trigger reload when parent increments the counter (e.g. Reload menu option)
   useEffect(() => {
