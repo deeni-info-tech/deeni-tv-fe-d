@@ -932,10 +932,6 @@ export function SyncedVideoPlayer({
   // syncImmediateAfterTransitionRef — holds the latest closure so playNextVideo
   // (defined before syncImmediateAfterTransition) can call it without a TDZ error.
   const syncImmediateAfterTransitionRef = useRef<(channelId: string) => Promise<void>>(async () => {})
-  // Tracks whether iOS audio has been unlocked by a user gesture (handleFirstTimeStart).
-  // Once true, subsequent initializePlayer calls (channel switch, reload) can start
-  // unmuted — iOS remembers the audio permission for the page session.
-  const iosAudioUnlockedRef = useRef<boolean>(false)
   
   // YouTube player hook
   const { 
@@ -1490,9 +1486,7 @@ export function SyncedVideoPlayer({
           videoId: program.videoId,
           startSeconds: Math.floor(startTime),
           volume: volume,
-          // On iOS, if the user already unlocked audio (first "Start Watching" gesture),
-          // subsequent player creates can start unmuted — iOS remembers page audio permission.
-          muted: isIOS && !iosAudioUnlockedRef.current,
+          muted: isIOS, // start muted on iOS so Safari allows autoplay; user taps to unmute
           onReady: () => {
             console.log('✅ 11 Player ready after channel switch')
             setPlayerReady(true)
@@ -1508,8 +1502,8 @@ export function SyncedVideoPlayer({
             }
             
             setYouTubeVolume(volume)
-            // On iOS: unmute if audio was previously unlocked by user gesture
-            if (!isIOS || iosAudioUnlockedRef.current) {
+            // On iOS keep muted until user taps the unmute button (user gesture required)
+            if (!isIOS) {
               setIsMuted(false)
               setYouTubeMuted(false)
             }
@@ -1640,9 +1634,7 @@ export function SyncedVideoPlayer({
           videoId: program.videoId,
           startSeconds: Math.floor(startTime),
           volume: volume,
-          // On iOS, if the user already unlocked audio (first "Start Watching" gesture),
-          // subsequent player creates can start unmuted — iOS remembers page audio permission.
-          muted: isIOS && !iosAudioUnlockedRef.current,
+          muted: isIOS, // start muted on iOS so Safari allows autoplay; user taps to unmute
           onReady: () => {
             console.log('✅ 22 Player ready - starting playback')
             setPlayerReady(true)
@@ -1660,8 +1652,8 @@ export function SyncedVideoPlayer({
             }
             
             setYouTubeVolume(volume)
-            // On iOS: unmute if audio was previously unlocked by user gesture
-            if (!isIOS || iosAudioUnlockedRef.current) {
+            // On iOS keep muted until user taps the unmute button (user gesture required)
+            if (!isIOS) {
               setIsMuted(false)
               setYouTubeMuted(false)
             }
@@ -1735,7 +1727,6 @@ export function SyncedVideoPlayer({
     // the real video starts with audio automatically.
     if (isPrimedRef.current) {
       unmuteAndResume(volume)
-      iosAudioUnlockedRef.current = true
     }
 
     // 1. Fetch channel list from live API and store in localStorage (only if not cached)
