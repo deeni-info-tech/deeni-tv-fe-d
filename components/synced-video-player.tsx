@@ -1475,7 +1475,7 @@ export function SyncedVideoPlayer({
       if (playerReady) {
         console.log('🔄 Loading new video in existing player')
         // First destroy and reset everything
-        destroy()
+        // destroy()
         setPlayerReady(false)
         
         // Small delay to ensure clean slate
