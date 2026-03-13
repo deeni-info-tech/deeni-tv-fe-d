@@ -2160,7 +2160,7 @@ export function SyncedVideoPlayer({
       if (videoEndTimeoutRef.current) {
         clearTimeout(videoEndTimeoutRef.current)
       }
-      destroy()
+      //destroy()
     }
   }, [destroy])
 
