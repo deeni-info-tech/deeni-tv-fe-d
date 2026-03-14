@@ -23,9 +23,6 @@ export async function GET(request: NextRequest) {
 
   const url = country === 'BD' ? BD_URL : DEFAULT_URL
 
-  const source = queryCountry ? 'query' : vercelCountry ? 'vercel-header' : 'fallback'
-  process.stdout.write(`\n>>> [donation-url] country=${country || '(none)'} source=${source} url=${url}\n\n`)
-
   return NextResponse.json({ url }, {
     headers: {
       // Cache for 1 hour on the CDN edge; revalidate in background.
